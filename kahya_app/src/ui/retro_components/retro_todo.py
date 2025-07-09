@@ -15,6 +15,14 @@ class RetroNotes(QWidget):
         self.notes_file = "kahya_notes.txt"
         
         self.setMinimumSize(300, 400)
+        
+        # Renkler - pixel art teması
+        self.bg_color = QColor(8, 20, 10)  # Koyu yeşil arka plan
+        self.grid_color = QColor(40, 80, 40, 60)  # Grid çizgileri
+        self.text_color = QColor(80, 255, 120)  # Parlak yeşil metin
+        self.border_color = QColor(80, 255, 120)  # Yeşil kenarlık
+        self.detail_color = QColor(80, 255, 120)  # Detay rengi
+        
         self.setup_ui()
         self.load_notes()
         
@@ -26,21 +34,21 @@ class RetroNotes(QWidget):
     def setup_ui(self):
         """UI'yi kur"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
         
         # Başlık
         title_label = QLabel("NOTLAR")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
             QLabel {
-                color: #00ff00;
-                font-size: 18px;
+                color: #50ff78;
+                font-size: 14px;
                 font-weight: bold;
                 font-family: 'Courier';
-                border: 2px solid #00ff00;
-                background-color: #000000;
-                padding: 5px;
+                border: 2px solid #50ff78;
+                background-color: #081410;
+                padding: 6px;
             }
         """)
         layout.addWidget(title_label)
@@ -49,19 +57,19 @@ class RetroNotes(QWidget):
         self.notes_list = QListWidget()
         self.notes_list.setStyleSheet("""
             QListWidget {
-                background-color: #000000;
-                border: 2px solid #00ff00;
-                color: #00ff00;
+                background-color: #081410;
+                border: 2px solid #50ff78;
+                color: #50ff78;
                 font-family: 'Courier';
-                font-size: 12px;
-                selection-background-color: #003300;
+                font-size: 10px;
+                selection-background-color: #102010;
             }
             QListWidget::item {
-                padding: 5px;
-                border-bottom: 1px solid #003300;
+                padding: 4px;
+                border-bottom: 1px solid #102010;
             }
             QListWidget::item:selected {
-                background-color: #004400;
+                background-color: #183018;
             }
         """)
         layout.addWidget(self.notes_list)
@@ -73,15 +81,15 @@ class RetroNotes(QWidget):
         self.note_input.setPlaceholderText("Yeni not ekle...")
         self.note_input.setStyleSheet("""
             QLineEdit {
-                background-color: #000000;
-                border: 2px solid #00ff00;
-                color: #00ff00;
+                background-color: #081410;
+                border: 2px solid #50ff78;
+                color: #50ff78;
                 font-family: 'Courier';
-                font-size: 12px;
-                padding: 5px;
+                font-size: 10px;
+                padding: 6px;
             }
             QLineEdit:focus {
-                border: 2px solid #00ff88;
+                border: 2px solid #50ff78;
             }
         """)
         self.note_input.returnPressed.connect(self.add_note)
@@ -90,21 +98,21 @@ class RetroNotes(QWidget):
         add_button = QPushButton("+")
         add_button.setStyleSheet("""
             QPushButton {
-                background-color: #000000;
-                border: 2px solid #00ff00;
-                color: #00ff00;
+                background-color: #081410;
+                border: 2px solid #50ff78;
+                color: #50ff78;
                 font-family: 'Courier';
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: bold;
-                padding: 5px 10px;
-                min-width: 30px;
+                padding: 6px 12px;
+                min-width: 32px;
             }
             QPushButton:hover {
-                background-color: #003300;
-                border: 2px solid #00ff88;
+                background-color: #102010;
+                border: 2px solid #50ff78;
             }
             QPushButton:pressed {
-                background-color: #004400;
+                background-color: #183018;
             }
         """)
         add_button.clicked.connect(self.add_note)
@@ -117,12 +125,12 @@ class RetroNotes(QWidget):
         self.stats_label.setAlignment(Qt.AlignCenter)
         self.stats_label.setStyleSheet("""
             QLabel {
-                color: #00ff00;
+                color: #50ff78;
                 font-family: 'Courier';
-                font-size: 10px;
-                border: 1px solid #00ff00;
-                background-color: #000000;
-                padding: 3px;
+                font-size: 9px;
+                border: 1px solid #50ff78;
+                background-color: #081410;
+                padding: 4px;
             }
         """)
         layout.addWidget(self.stats_label)
@@ -198,60 +206,101 @@ class RetroNotes(QWidget):
                     print(f"Geçersiz index: {note_index}")
         except Exception as e:
             print(f"Not silme hatası: {e}")
+            
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, False)  # Pixel art için
+        
+        # Widget boyutları
+        w, h = self.width(), self.height()
+        
+        # Arka plan (gridli pixel art)
+        painter.fillRect(0, 0, w, h, self.bg_color)
+        
+        # Grid çizgileri
+        grid_size = 8
+        painter.setPen(QPen(self.grid_color, 1))
+        for x in range(0, w, grid_size):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, grid_size):
+            painter.drawLine(0, y, w, y)
+        
+        # Dış çerçeve (pixel-art)
+        painter.setPen(QPen(self.border_color, 4))
+        painter.setBrush(Qt.NoBrush)
+        margin = 12
+        painter.drawRect(margin, margin, w-2*margin, h-2*margin)
+        
+        # Köşe detayları
+        painter.setPen(QPen(self.border_color, 4))
+        for dx in [0, w-2*margin]:
+            for dy in [0, h-2*margin]:
+                painter.drawPoint(margin+dx, margin+dy)
+        
+        # Yan çıkıntılar
+        painter.setPen(QPen(self.border_color, 4))
+        painter.drawLine(margin-8, h//2-40, margin, h//2-40)
+        painter.drawLine(margin-8, h//2+40, margin, h//2+40)
+        painter.drawLine(w-margin+8, h//2-40, w-margin, h//2-40)
+        painter.drawLine(w-margin+8, h//2+40, w-margin, h//2+40)
+        
+        # Üst ve alt detay çizgiler
+        painter.drawLine(margin+24, margin-8, w-margin-24, margin-8)
+        painter.drawLine(margin+24, h-margin+8, w-margin-24, h-margin+8)
         
     def cleanup(self):
         """Temizlik"""
         self.update_timer.stop()
-
 
 class NoteItem(QFrame):
     def __init__(self, note_text, note_index, parent=None):
         super().__init__(parent)
         self.note_text = note_text
         self.note_index = note_index
+        self.notes_widget = None
         
         self.setup_ui()
         
     def setup_ui(self):
         """UI'yi kur"""
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(10)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(8)
         
         # Not metni
-        self.note_label = QLabel(self.note_text)
-        self.note_label.setWordWrap(True)
-        self.note_label.setStyleSheet("""
+        note_label = QLabel(self.note_text)
+        note_label.setWordWrap(True)
+        note_label.setStyleSheet("""
             QLabel {
-                color: #00ff00;
+                color: #50ff78;
                 font-family: 'Courier';
-                font-size: 11px;
+                font-size: 10px;
                 background-color: transparent;
                 border: none;
             }
         """)
-        layout.addWidget(self.note_label, 1)
+        layout.addWidget(note_label)
         
         # Silme butonu
         delete_button = QPushButton("×")
+        delete_button.setFixedSize(20, 20)
         delete_button.setStyleSheet("""
             QPushButton {
-                background-color: #000000;
-                border: 1px solid #ff0000;
-                color: #ff0000;
+                background-color: #081410;
+                border: 1px solid #50ff78;
+                color: #50ff78;
                 font-family: 'Courier';
-                font-size: 14px;
+                font-size: 12px;
                 font-weight: bold;
-                padding: 2px 6px;
-                min-width: 20px;
-                max-width: 20px;
+                border-radius: 2px;
             }
             QPushButton:hover {
-                background-color: #330000;
+                background-color: #ff4444;
                 border: 1px solid #ff4444;
+                color: #ffffff;
             }
             QPushButton:pressed {
-                background-color: #440000;
+                background-color: #cc3333;
             }
         """)
         delete_button.clicked.connect(self.delete_note)
@@ -259,18 +308,19 @@ class NoteItem(QFrame):
         
     def delete_note(self):
         """Notu sil"""
-        # Doğrudan RetroNotes referansını kullan
-        if hasattr(self, 'notes_widget') and self.notes_widget:
-            print(f"Not silme çağrıldı: index={self.note_index}")
+        if self.notes_widget:
             self.notes_widget.delete_note(self.note_index)
-        else:
-            print("notes_widget referansı bulunamadı!")
-        
+            
     def paintEvent(self, event):
-        """Özel çizim"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing, False)  # Pixel art için
         
-        # Alt kenarlık
-        painter.setPen(QPen(QColor(0, 100, 0), 1))
-        painter.drawLine(0, self.height() - 1, self.width(), self.height() - 1) 
+        # Widget boyutları
+        w, h = self.width(), self.height()
+        
+        # Arka plan (şeffaf)
+        painter.fillRect(0, 0, w, h, QColor(8, 20, 10, 100))
+        
+        # Alt çizgi
+        painter.setPen(QPen(QColor(80, 255, 120, 50), 1))
+        painter.drawLine(0, h-1, w, h-1) 

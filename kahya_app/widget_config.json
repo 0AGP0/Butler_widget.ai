@@ -1,0 +1,33 @@
+{
+  "saat": {
+    "x": 3195,
+    "y": 3,
+    "visible": false
+  },
+  "takvim": {
+    "x": 3415,
+    "y": 3,
+    "visible": false
+  },
+  "kahya_yuzu": {
+    "x": 1921,
+    "y": 4,
+    "visible": false
+  },
+  "sohbet": {
+    "x": 1930,
+    "y": 375,
+    "visible": false
+  },
+  "ses_dalgasi": {
+    "x": 2261,
+    "y": 4,
+    "visible": false
+  },
+  "notlar": {
+    "x": 3519,
+    "y": 317,
+    "visible": false
+  },
+  "current_monitor": 2
+}

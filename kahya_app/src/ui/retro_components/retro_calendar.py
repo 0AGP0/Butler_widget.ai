@@ -17,6 +17,15 @@ class RetroCalendar(QWidget):
         self.reminders = []
         self.reminder_manager = None
         
+        # Renkler - pixel art teması
+        self.bg_color = QColor(8, 20, 10)  # Koyu yeşil arka plan
+        self.grid_color = QColor(40, 80, 40, 60)  # Grid çizgileri
+        self.text_color = QColor(80, 255, 120)  # Parlak yeşil metin
+        self.border_color = QColor(80, 255, 120)  # Yeşil kenarlık
+        self.detail_color = QColor(80, 255, 120)  # Detay rengi
+        self.today_color = QColor(80, 255, 120)  # Bugün rengi
+        self.reminder_color = QColor(255, 136, 0)  # Hatırlatıcı rengi
+        
         # Güncelleme zamanlayıcısı
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_calendar)
@@ -28,21 +37,21 @@ class RetroCalendar(QWidget):
     def setup_ui(self):
         """UI'yi kur"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
         
         # Başlık
         self.title_label = QLabel()
         self.title_label.setAlignment(Qt.AlignCenter)
         self.title_label.setStyleSheet("""
             QLabel {
-                color: #00ff00;
-                font-size: 16px;
+                color: #50ff78;
+                font-size: 14px;
                 font-weight: bold;
                 font-family: 'Courier';
-                border: 2px solid #00ff00;
-                background-color: #000000;
-                padding: 5px;
+                border: 2px solid #50ff78;
+                background-color: #081410;
+                padding: 6px;
             }
         """)
         layout.addWidget(self.title_label)
@@ -56,13 +65,13 @@ class RetroCalendar(QWidget):
             day_label.setAlignment(Qt.AlignCenter)
             day_label.setStyleSheet("""
                 QLabel {
-                    color: #00ff00;
+                    color: #50ff78;
                     font-family: 'Courier';
-                    font-size: 12px;
+                    font-size: 10px;
                     font-weight: bold;
-                    background-color: #001100;
-                    border: 1px solid #00ff00;
-                    padding: 3px;
+                    background-color: #102010;
+                    border: 1px solid #50ff78;
+                    padding: 4px;
                 }
             """)
             days_layout.addWidget(day_label)
@@ -71,7 +80,7 @@ class RetroCalendar(QWidget):
         
         # Takvim ızgarası
         self.calendar_grid = QGridLayout()
-        self.calendar_grid.setSpacing(2)
+        self.calendar_grid.setSpacing(3)
         layout.addLayout(self.calendar_grid)
         
         # Alt bilgi
@@ -79,12 +88,12 @@ class RetroCalendar(QWidget):
         self.info_label.setAlignment(Qt.AlignCenter)
         self.info_label.setStyleSheet("""
             QLabel {
-                color: #00ff00;
+                color: #50ff78;
                 font-family: 'Courier';
-                font-size: 10px;
-                border: 1px solid #00ff00;
-                background-color: #000000;
-                padding: 3px;
+                font-size: 9px;
+                border: 1px solid #50ff78;
+                background-color: #081410;
+                padding: 4px;
             }
         """)
         layout.addWidget(self.info_label)
@@ -125,7 +134,7 @@ class RetroCalendar(QWidget):
         """Gün widget'ı oluştur"""
         day_label = QLabel(str(day))
         day_label.setAlignment(Qt.AlignCenter)
-        day_label.setMinimumSize(35, 25)
+        day_label.setMinimumSize(32, 22)
         
         # Bugün mü kontrol et
         today = date.today()
@@ -142,7 +151,7 @@ class RetroCalendar(QWidget):
                     QLabel {
                         color: #000000;
                         font-family: 'Courier';
-                        font-size: 12px;
+                        font-size: 10px;
                         font-weight: bold;
                         background-color: #ff8800;
                         border: 1px solid #ff8800;
@@ -154,10 +163,10 @@ class RetroCalendar(QWidget):
                     QLabel {
                         color: #000000;
                         font-family: 'Courier';
-                        font-size: 12px;
+                        font-size: 10px;
                         font-weight: bold;
-                        background-color: #00ff00;
-                        border: 1px solid #00ff00;
+                        background-color: #50ff78;
+                        border: 1px solid #50ff78;
                         padding: 3px;
                     }
                 """)
@@ -168,7 +177,7 @@ class RetroCalendar(QWidget):
                     QLabel {
                         color: #000000;
                         font-family: 'Courier';
-                        font-size: 12px;
+                        font-size: 10px;
                         font-weight: bold;
                         background-color: #ff6600;
                         border: 1px solid #ff6600;
@@ -182,65 +191,93 @@ class RetroCalendar(QWidget):
             else:
                 day_label.setStyleSheet("""
                     QLabel {
-                        color: #00ff00;
+                        color: #50ff78;
                         font-family: 'Courier';
-                        font-size: 12px;
-                        background-color: #000000;
-                        border: 1px solid #003300;
+                        font-size: 10px;
+                        background-color: #081410;
+                        border: 1px solid #102010;
                         padding: 3px;
                     }
                     QLabel:hover {
-                        background-color: #001100;
-                        border: 1px solid #00ff00;
+                        background-color: #102010;
+                        border: 1px solid #50ff78;
                     }
                 """)
         
         # Tooltip ekle
         if has_reminder:
             reminder_text = self.get_reminders_for_date(day, current_month, current_year)
-            day_label.setToolTip(f"📅 Hatırlatıcılar:\n{reminder_text}")
-            
+            day_label.setToolTip(reminder_text)
+        
         return day_label
         
     def paintEvent(self, event):
-        """Özel çizim"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing, False)  # Pixel art için
         
-        # Ana kenarlık
-        painter.setPen(QPen(QColor(0, 200, 0), 2))
-        painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        # Widget boyutları
+        w, h = self.width(), self.height()
         
-        # İç kenarlık
-        painter.setPen(QPen(QColor(0, 100, 0), 1))
-        painter.drawRect(self.rect().adjusted(2, 2, -3, -3))
+        # Arka plan (gridli pixel art)
+        painter.fillRect(0, 0, w, h, self.bg_color)
+        
+        # Grid çizgileri
+        grid_size = 8
+        painter.setPen(QPen(self.grid_color, 1))
+        for x in range(0, w, grid_size):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, grid_size):
+            painter.drawLine(0, y, w, y)
+        
+        # Dış çerçeve (pixel-art)
+        painter.setPen(QPen(self.border_color, 4))
+        painter.setBrush(Qt.NoBrush)
+        margin = 12
+        painter.drawRect(margin, margin, w-2*margin, h-2*margin)
+        
+        # Köşe detayları
+        painter.setPen(QPen(self.border_color, 4))
+        for dx in [0, w-2*margin]:
+            for dy in [0, h-2*margin]:
+                painter.drawPoint(margin+dx, margin+dy)
+        
+        # Yan çıkıntılar
+        painter.setPen(QPen(self.border_color, 4))
+        painter.drawLine(margin-8, h//2-30, margin, h//2-30)
+        painter.drawLine(margin-8, h//2+30, margin, h//2+30)
+        painter.drawLine(w-margin+8, h//2-30, w-margin, h//2-30)
+        painter.drawLine(w-margin+8, h//2+30, w-margin, h//2+30)
+        
+        # Üst ve alt detay çizgiler
+        painter.drawLine(margin+24, margin-8, w-margin-24, margin-8)
+        painter.drawLine(margin+24, h-margin+8, w-margin-24, h-margin+8)
         
         # Köşe dekorasyonları
         self.draw_corners(painter)
         
     def draw_corners(self, painter):
         """Köşe dekorasyonlarını çiz"""
-        width = self.width()
-        height = self.height()
-        corner_size = 10
+        w, h = self.width(), self.height()
+        corner_size = 12
+        corner_color = self.detail_color
         
-        painter.setPen(QPen(QColor(0, 200, 0), 2))
+        painter.setPen(QPen(corner_color, 3))
         
         # Sol üst köşe
-        painter.drawLine(5, 5, corner_size, 5)
-        painter.drawLine(5, 5, 5, corner_size)
+        painter.drawLine(4, 4, corner_size, 4)
+        painter.drawLine(4, 4, 4, corner_size)
         
         # Sağ üst köşe
-        painter.drawLine(width - corner_size, 5, width - 5, 5)
-        painter.drawLine(width - 5, 5, width - 5, corner_size)
+        painter.drawLine(w - corner_size, 4, w - 4, 4)
+        painter.drawLine(w - 4, 4, w - 4, corner_size)
         
         # Sol alt köşe
-        painter.drawLine(5, height - corner_size, 5, height - 5)
-        painter.drawLine(5, height - 5, corner_size, height - 5)
+        painter.drawLine(4, h - corner_size, 4, h - 4)
+        painter.drawLine(4, h - 4, corner_size, h - 4)
         
         # Sağ alt köşe
-        painter.drawLine(width - corner_size, height - 5, width - 5, height - 5)
-        painter.drawLine(width - 5, height - corner_size, width - 5, height - 5)
+        painter.drawLine(w - corner_size, h - 4, w - 4, h - 4)
+        painter.drawLine(w - 4, h - corner_size, w - 4, h - 4)
         
     def resizeEvent(self, event):
         """Widget yeniden boyutlandırıldığında"""
@@ -251,51 +288,38 @@ class RetroCalendar(QWidget):
         """Hatırlatıcı yöneticisini ayarla"""
         self.reminder_manager = reminder_manager
         self.update_reminders()
-    
+        
     def update_reminders(self):
         """Hatırlatıcıları güncelle"""
-        print(f"Takvim güncelleniyor...")
         if self.reminder_manager:
-            self.reminders = self.reminder_manager.get_reminders()
-            print(f"Takvim: {len(self.reminders)} hatırlatıcı bulundu")
-            for r in self.reminders:
-                print(f"Takvimde: {r[1]} - {r[3]}")
-        self.update_calendar()
-    
+            self.reminders = self.reminder_manager.get_all_reminders()
+            self.update_calendar()
+            
     def has_reminder_on_date(self, day, month, year):
         """Belirli bir tarihte hatırlatıcı var mı kontrol et"""
-        if not self.reminders:
+        if not self.reminder_manager:
             return False
-        
+            
         target_date = date(year, month, day)
-        
         for reminder in self.reminders:
-            try:
-                reminder_date = datetime.fromisoformat(reminder[3]).date()
-                if reminder_date == target_date:
-                    return True
-            except:
-                continue
+            if reminder['date'] == target_date:
+                return True
         return False
-    
+        
     def get_reminders_for_date(self, day, month, year):
-        """Belirli bir tarihteki hatırlatıcıları getir"""
-        if not self.reminders:
+        """Belirli bir tarihteki hatırlatıcıları al"""
+        if not self.reminder_manager:
             return ""
-        
+            
         target_date = date(year, month, day)
-        reminders_text = []
-        
+        reminders = []
         for reminder in self.reminders:
-            try:
-                reminder_date = datetime.fromisoformat(reminder[3]).date()
-                if reminder_date == target_date:
-                    time_str = datetime.fromisoformat(reminder[3]).strftime("%H:%M")
-                    reminders_text.append(f"• {time_str} - {reminder[1]}")
-            except:
-                continue
+            if reminder['date'] == target_date:
+                reminders.append(reminder['title'])
         
-        return "\n".join(reminders_text)
+        if reminders:
+            return f"Hatırlatıcılar:\n" + "\n".join(reminders)
+        return ""
         
     def cleanup(self):
         """Temizlik"""

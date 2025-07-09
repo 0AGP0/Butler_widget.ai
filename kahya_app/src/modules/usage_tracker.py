@@ -43,23 +43,22 @@ class UsageTracker(QObject):
         while self.is_running:
             try:
                 current_app = self._get_active_application()
-                
+
                 if current_app != self.current_app:
                     # Uygulama değişti
                     if self.current_app and self.app_start_time:
                         duration = int((datetime.now() - self.app_start_time).total_seconds())
                         self._log_app_usage(self.current_app, duration)
-                    
+
                     # Yeni uygulamayı başlat
                     self.current_app = current_app
                     self.app_start_time = datetime.now()
-                    
+
                     # Sinyal gönder
                     if self.current_app:
                         self.app_changed.emit(self.current_app, current_app)
-                
+
                 time.sleep(self.check_interval)
-            
             except Exception as e:
                 print(f"Kullanım takibi hatası: {e}")
                 time.sleep(self.check_interval)

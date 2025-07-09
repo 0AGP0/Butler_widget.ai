@@ -5,13 +5,14 @@ import os
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication, QShortcut
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtCore import Qt
 from src.ui.kahya_wallpaper import KahyaWallpaper
 from src.core.command_router import CommandRouter
 from src.core.llm_client import LLMClient
 from src.modules.usage_tracker import UsageTracker
-from src.modules.user_model import UserModel
+
 from src.modules.reminder import ReminderManager
 from src.core.database import Database
 
@@ -69,6 +70,27 @@ def main():
     # Uygulama kapanırken temizlik
     app.aboutToQuit.connect(usage_tracker.cleanup)
     app.aboutToQuit.connect(kahya.cleanup)
+    
+    # Global kısayol tuşları (uygulama seviyesinde)
+    def setup_global_shortcuts():
+        # Ctrl+Shift+C: Kontrol menüsünü göster
+        control_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), kahya)
+        control_shortcut.activated.connect(kahya.show_control_menu)
+        
+        # Ctrl+Shift+W: Gizli widget'ları göster
+        widget_shortcut = QShortcut(QKeySequence("Ctrl+Shift+W"), kahya)
+        widget_shortcut.activated.connect(kahya.show_hidden_widgets)
+        
+        # Ctrl+Shift+A: Tüm widget'ları gizle/göster
+        toggle_all_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), kahya)
+        toggle_all_shortcut.activated.connect(kahya.toggle_all_widgets)
+        
+        # Ctrl+Shift+H: Ana uygulamayı gizle/göster
+        hide_shortcut = QShortcut(QKeySequence("Ctrl+Shift+H"), kahya)
+        hide_shortcut.activated.connect(kahya.toggle_visibility)
+    
+    # Global kısayol tuşlarını kur
+    setup_global_shortcuts()
     
     # Pencereyi göster (sadece KahyaWallpaper)
     kahya.show()

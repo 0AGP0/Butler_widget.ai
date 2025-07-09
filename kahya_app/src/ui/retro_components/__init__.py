@@ -7,6 +7,7 @@ from .retro_todo import RetroNotes
 from .retro_calendar import RetroCalendar
 from .retro_chatbox import RetroChatbox
 from .sound_wave import SoundWave
+from .retro_inventory import RetroInventory
 
 __all__ = [
     'KahyaFace',
@@ -14,5 +15,6 @@ __all__ = [
     'RetroNotes',
     'RetroCalendar',
     'RetroChatbox',
-    'SoundWave'
+    'SoundWave',
+    'RetroInventory'
 ] 

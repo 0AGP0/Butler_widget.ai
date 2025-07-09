@@ -4,6 +4,7 @@ import threading, time
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient
+from PyQt5.QtGui import QFont
 
 class SoundWave(QWidget):
     def __init__(self, parent=None):
@@ -27,6 +28,13 @@ class SoundWave(QWidget):
         self.peaks     = np.full(self.num_bands, 1.0, dtype=np.float32)
         self.phase     = 0.0
         self.is_listening = False  # Mikrofon dinleme durumu
+
+        # Renkler - pixel art teması
+        self.bg_color = QColor(8, 20, 10)  # Koyu yeşil arka plan
+        self.grid_color = QColor(40, 80, 40, 60)  # Grid çizgileri
+        self.text_color = QColor(80, 255, 120)  # Parlak yeşil metin
+        self.border_color = QColor(80, 255, 120)  # Yeşil kenarlık
+        self.detail_color = QColor(80, 255, 120)  # Detay rengi
 
         # --- FFT frekans ekseni ve eşit bant indeksleri ---
         self.freqs = np.fft.rfftfreq(self.fft_size, 1/self.sample_rate)
@@ -72,7 +80,7 @@ class SoundWave(QWidget):
                     # Önce yeni peak'leri al
                     self.peaks = np.maximum(self.peaks, vals)
                     # Hedef yükseklik: oran * pencere yüksekliği
-                    h = self.height() - 20
+                    h = self.height() - 40  # Margin için daha az alan
                     self.target = (vals / self.peaks) * h
 
                 time.sleep(1/60)
@@ -95,28 +103,73 @@ class SoundWave(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, False)
+        painter.setRenderHint(QPainter.Antialiasing, False)  # Pixel art için
+        
+        # Widget boyutları
         w, h = self.width(), self.height()
-        painter.fillRect(0, 0, w, h, QColor(10, 10, 20))
+        
+        # Arka plan (gridli pixel art)
+        painter.fillRect(0, 0, w, h, self.bg_color)
+        
+        # Grid çizgileri
+        grid_size = 8
+        painter.setPen(QPen(self.grid_color, 1))
+        for x in range(0, w, grid_size):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, grid_size):
+            painter.drawLine(0, y, w, y)
+        
+        # Dış çerçeve (pixel-art)
+        painter.setPen(QPen(self.border_color, 4))
+        painter.setBrush(Qt.NoBrush)
+        margin = 12
+        painter.drawRect(margin, margin, w-2*margin, h-2*margin)
+        
+        # Köşe detayları
+        painter.setPen(QPen(self.border_color, 4))
+        for dx in [0, w-2*margin]:
+            for dy in [0, h-2*margin]:
+                painter.drawPoint(margin+dx, margin+dy)
+        
+        # Yan çıkıntılar
+        painter.setPen(QPen(self.border_color, 4))
+        painter.drawLine(margin-8, h//2-30, margin, h//2-30)
+        painter.drawLine(margin-8, h//2+30, margin, h//2+30)
+        painter.drawLine(w-margin+8, h//2-30, w-margin, h//2-30)
+        painter.drawLine(w-margin+8, h//2+30, w-margin, h//2+30)
+        
+        # Üst ve alt detay çizgiler
+        painter.drawLine(margin+24, margin-8, w-margin-24, margin-8)
+        painter.drawLine(margin+24, h-margin+8, w-margin-24, h-margin+8)
 
-        spacing = 1
-        bar_w = int((w - 20 - spacing*(self.num_bands-1)) / self.num_bands)
+        # Ses dalgaları (pixel art tarzında)
+        spacing = 2
+        bar_w = int((w - 40 - spacing*(self.num_bands-1)) / self.num_bands)
+        
+        # Başlangıç pozisyonu (margin'den sonra)
+        start_x = margin + 20
 
         for i, e_val in enumerate(self.envelope):
-            x = 10 + i * (bar_w + spacing)
-            y = h - int(e_val) - 10
+            x = start_x + i * (bar_w + spacing)
+            y = h - int(e_val) - margin - 20
 
-            col = QColor.fromHsvF((self.phase + i/self.num_bands) % 1, 1, 1)
-            grad = QLinearGradient(x, y, x, y + e_val)
-            grad.setColorAt(0.0, col.lighter(140))
-            grad.setColorAt(1.0, col.darker(200))
+            # Pixel art tarzında renk (yeşil tonları)
+            hue = (self.phase + i/self.num_bands) % 1
+            # Yeşil tonlarında sınırla (0.2-0.4 arası)
+            hue = 0.2 + (hue * 0.2)
+            col = QColor.fromHsvF(hue, 0.8, 0.9)
+            
+            # Pixel art tarzında gradient yerine düz renk
+            painter.setBrush(QBrush(col))
+            painter.setPen(QPen(col.darker(150), 1))
+            
+            # Yuvarlak köşe yerine düz dikdörtgen (pixel art)
+            painter.drawRect(x, y, bar_w, int(e_val))
 
-            painter.setBrush(QBrush(grad))
-            painter.setPen(Qt.NoPen)
-            painter.drawRoundedRect(x, y, bar_w, int(e_val), 3, 3)
-
-        painter.setPen(QPen(QColor(180, 255, 200), 1))
-        painter.drawText(12, 18, "Ses Spektrum — Stabil Peak Tracking")
+        # Başlık metni
+        painter.setPen(QPen(self.text_color, 2))
+        painter.setFont(QFont("Courier", 10, QFont.Bold))
+        painter.drawText(margin + 15, margin + 20, "SES SPEKTRUM — PIXEL ART")
 
     def cleanup(self):
         self.timer.stop()

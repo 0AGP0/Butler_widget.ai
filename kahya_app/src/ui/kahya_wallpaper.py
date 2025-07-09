@@ -1,17 +1,21 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, 
-                             QLabel, QApplication, QDesktopWidget, QSystemTrayIcon,
-                             QMenu, QAction, QMessageBox)
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QMutex
-from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, QFont, QFontMetrics, QIcon
-from PyQt5.QtWinExtras import QtWin
-import sys
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QApplication, 
+                             QDesktopWidget, QSystemTrayIcon, QMenu, QAction, 
+                             QMessageBox)
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QMutex
+from PyQt5.QtGui import QPainter, QColor, QBrush, QKeySequence
+from PyQt5.QtWidgets import QShortcut
 import os
 
 # Retro bileşenleri import et
 from .retro_components import (
     KahyaFace, RetroClock, RetroCalendar, 
-    RetroChatbox, SoundWave, RetroNotes
+    RetroChatbox, SoundWave, RetroNotes, RetroInventory
 )
+
+# Widget yönetici import et
+from .widget_manager import WidgetManager
+from .monitor_manager import MonitorManager
+from .control_menu import ControlMenu
 
 class KahyaWallpaper(QWidget):
     command_received = pyqtSignal(str)  # Komut alındığında
@@ -21,10 +25,31 @@ class KahyaWallpaper(QWidget):
         self.db_path = db_path
         self.usage_tracker = usage_tracker
         
-        # Pencere ayarları
+        # Pencere ayarları - widget tarzında
         self.setWindowTitle("Kahya AI Desktop Assistant")
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_NoSystemBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        
+        # Focus policy - kısayol tuşları için
+        self.setFocusPolicy(Qt.StrongFocus)
+        
+        # Widget yönetici
+        self.widget_manager = WidgetManager("widget_config.json")
+        self.widget_manager.parent = self  # Parent referansını ayarla
+        
+        # Monitör yönetici
+        self.monitor_manager = MonitorManager()
+        self.monitor_manager.monitor_changed.connect(self.on_monitor_changed)
+        
+        # Widget yöneticiye monitör yönetici referansını ayarla
+        self.widget_manager.set_monitor_manager(self.monitor_manager)
+        
+        # Kaydedilmiş monitörü yükle
+        saved_monitor = self.widget_manager.current_monitor
+        if saved_monitor < self.monitor_manager.get_monitor_count():
+            self.monitor_manager.switch_to_monitor(saved_monitor)
         
         # Tam ekran yap
         self.setup_fullscreen()
@@ -32,8 +57,24 @@ class KahyaWallpaper(QWidget):
         # UI bileşenleri
         self.setup_ui()
         
+        # Kontrol menüsü
+        self.control_menu = ControlMenu(self.widget_manager, self.monitor_manager, self)
+        self.control_menu.widget_toggled.connect(self.on_widget_toggled)
+        self.control_menu.positions_reset.connect(self.widget_manager.reset_positions)
+        self.control_menu.monitor_changed.connect(self.monitor_manager.switch_to_monitor)
+        
+        # Kontrol menüsünü sağ üst köşeye yerleştir
+        screen_geometry = self.screen().geometry()
+        menu_x = screen_geometry.width() - 300 - 50  # 300 genişlik + 50 margin
+        menu_y = 50
+        self.control_menu.move(menu_x, menu_y)
+        self.control_menu.show()
+        
         # Sistem tray
         self.setup_system_tray()
+        
+        # Global kısayol tuşları
+        self.setup_global_shortcuts()
         
         # Güncelleme zamanlayıcısı
         self.update_timer = QTimer()
@@ -49,112 +90,129 @@ class KahyaWallpaper(QWidget):
             
     def setup_fullscreen(self):
         """Tam ekran ayarla"""
-        desktop = QDesktopWidget()
-        screen_geometry = desktop.screenGeometry()
+        screen_geometry = self.monitor_manager.get_current_screen_geometry()
         self.setGeometry(screen_geometry)
         
     def setup_ui(self):
-        """UI'yi kur - istediğiniz layout'a göre"""
-        # Ana layout
-        main_layout = QGridLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        """UI'yi kur - sürüklenebilir widget'lar olarak"""
+        # Widget'ları oluştur
+        self.create_widgets()
         
-        # Layout düzeni:
-        # Sol üst: Saat
+
+        
+    def create_widgets(self):
+        """Sürüklenebilir widget'ları oluştur"""
+        # Saat widget'ı
         self.clock = RetroClock()
-        main_layout.addWidget(self.clock, 0, 0)
+        self.clock_widget = self.widget_manager.create_widget("saat", "SAAT", self.clock)
         
-        # Orta üst: Envanter (gelecekte)
-        self.inventory_placeholder = self.create_placeholder("ENVANTER")
-        main_layout.addWidget(self.inventory_placeholder, 0, 1)
-        
-        # Sağ üst: Ses dalgası
-        self.sound_wave = SoundWave()
-        main_layout.addWidget(self.sound_wave, 0, 2)
-        
-        # Sol orta: Takvim
+        # Takvim widget'ı
         self.calendar = RetroCalendar()
-        main_layout.addWidget(self.calendar, 1, 0)
+        self.calendar_widget = self.widget_manager.create_widget("takvim", "TAKVİM", self.calendar)
         
-        # Orta: Kahya yüzü
+        # Kahya yüzü widget'ı
         self.kahya_face = KahyaFace()
-        main_layout.addWidget(self.kahya_face, 1, 1)
+        self.kahya_widget = self.widget_manager.create_widget("kahya_yuzu", "KAHYA", self.kahya_face)
         
-        # Sağ orta: Boş alan (gelecekte kullanım istatistikleri)
-        self.stats_placeholder = self.create_placeholder("İSTATİSTİKLER")
-        main_layout.addWidget(self.stats_placeholder, 1, 2)
-        
-        # Sol alt: Notlar
-        self.notes = RetroNotes()
-        main_layout.addWidget(self.notes, 2, 0)
-        
-        # Orta alt: Chatbox
+        # Chatbox widget'ı
         self.retro_chatbox = RetroChatbox()
-        main_layout.addWidget(self.retro_chatbox, 2, 1)
+        self.chatbox_widget = self.widget_manager.create_widget("sohbet", "SOHBET", self.retro_chatbox)
         
         # Chatbox'tan Kahya yüzüne konuşma durumu sinyalini bağla
         self.retro_chatbox.kahya_talking.connect(self.kahya_face.set_talking)
         
-        # Sağ alt: Kapı (gelecekte)
-        self.door_placeholder = self.create_placeholder("KAPI")
-        main_layout.addWidget(self.door_placeholder, 2, 2)
+        # Ses dalgası widget'ı
+        self.sound_wave = SoundWave()
+        self.sound_widget = self.widget_manager.create_widget("ses_dalgasi", "SES", self.sound_wave)
         
-        # Layout ağırlıklarını ayarla
-        main_layout.setRowStretch(0, 1)  # Üst satır
-        main_layout.setRowStretch(1, 2)  # Orta satır daha büyük (Kahya yüzü için)
-        main_layout.setRowStretch(2, 1)  # Alt satır
+        # Notlar widget'ı
+        self.notes = RetroNotes()
+        self.notes_widget = self.widget_manager.create_widget("notlar", "NOTLAR", self.notes)
         
-        main_layout.setColumnStretch(0, 1)  # Sol sütun
-        main_layout.setColumnStretch(1, 2)  # Orta sütun daha büyük (Kahya yüzü için)
-        main_layout.setColumnStretch(2, 1)  # Sağ sütun
+        # Envanter widget'ı
+        self.inventory = RetroInventory()
+        self.inventory_widget = self.widget_manager.create_widget("envanter", "ENVANTER", self.inventory)
         
-    def create_placeholder(self, text):
-        """Yer tutucu widget oluştur"""
-        placeholder = QWidget()
-        placeholder.setMinimumSize(180, 120)
-        placeholder.setStyleSheet("""
-            QWidget {
-                background-color: #000000;
-                border: 2px solid #00ff00;
-            }
-        """)
+        # Tüm widget'ları göster
+        self.widget_manager.show_all_widgets()
         
-        # Layout
-        layout = QVBoxLayout(placeholder)
-        layout.setContentsMargins(8, 8, 8, 8)
+    def on_monitor_changed(self, monitor_index):
+        """Monitör değiştiğinde"""
+        # Ana pencereyi yeni monitöre taşı
+        screen_geometry = self.monitor_manager.get_screen_geometry(monitor_index)
+        self.setGeometry(screen_geometry)
         
-        # Başlık
-        title = QLabel(text)
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("""
-            QLabel {
-                color: #00ff00;
-                font-family: 'Courier';
-                font-size: 12px;
-                font-weight: bold;
-                border: 1px solid #00ff00;
-                background-color: #001100;
-                padding: 3px;
-            }
-        """)
-        layout.addWidget(title)
+        # Widget pozisyonlarını yeni monitöre göre ayarla
+        self.adjust_widget_positions_for_monitor(monitor_index)
         
-        # İçerik alanı
-        content = QLabel("Yakında...")
-        content.setAlignment(Qt.AlignCenter)
-        content.setStyleSheet("""
-            QLabel {
-                color: #00ff00;
-                font-family: 'Courier';
-                font-size: 10px;
-                background-color: transparent;
-                border: none;
-            }
-        """)
-        layout.addWidget(content)
+        # Konfigürasyona kaydet
+        self.widget_manager.set_current_monitor(monitor_index)
         
-        return placeholder
+    def adjust_widget_positions_for_monitor(self, monitor_index):
+        """Widget pozisyonlarını monitöre göre ayarla"""
+        screen_geometry = self.monitor_manager.get_screen_geometry(monitor_index)
+        
+        # Widget'ları yeni monitörün sınırları içinde tut
+        for widget_name, widget in self.widget_manager.widgets.items():
+            widget_geometry = widget.geometry()
+            
+            # Widget'ı yeni monitörün sınırları içinde tut
+            new_x = max(0, min(widget_geometry.x(), screen_geometry.width() - widget_geometry.width()))
+            new_y = max(0, min(widget_geometry.y(), screen_geometry.height() - widget_geometry.height()))
+            
+            widget.move(new_x, new_y)
+            
+            # Konfigürasyonu güncelle
+            if widget_name in self.widget_manager.config:
+                self.widget_manager.config[widget_name]["x"] = new_x
+                self.widget_manager.config[widget_name]["y"] = new_y
+                
+        self.widget_manager.save_config()
+        
+    def on_widget_toggled(self, widget_name, visible):
+        """Widget gizlendiğinde/gösterildiğinde"""
+        if widget_name in self.widget_manager.widgets:
+            widget = self.widget_manager.widgets[widget_name]
+            widget.set_visibility(visible)
+        
+    def toggle_all_widgets(self):
+        """Tüm widget'ları gizle/göster"""
+        all_visible = all(widget.is_visible for widget in self.widget_manager.widgets.values())
+        
+        if all_visible:
+            # Tümünü gizle
+            for widget in self.widget_manager.widgets.values():
+                widget.set_visibility(False)
+        else:
+            # Tümünü göster
+            for widget in self.widget_manager.widgets.values():
+                widget.set_visibility(True)
+                
+    def show_hidden_widgets(self):
+        """Gizli widget'ları göster"""
+        for widget in self.widget_manager.widgets.values():
+            if not widget.is_visible:
+                widget.set_visibility(True)
+                
+    def setup_global_shortcuts(self):
+        """Global kısayol tuşlarını kur"""
+        # Ctrl+Shift+C: Kontrol menüsünü göster
+        self.control_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
+        self.control_shortcut.activated.connect(self.show_control_menu)
+        
+        # Ctrl+Shift+W: Gizli widget'ları göster
+        self.widget_shortcut = QShortcut(QKeySequence("Ctrl+Shift+W"), self)
+        self.widget_shortcut.activated.connect(self.show_hidden_widgets)
+        
+        # Ctrl+Shift+A: Tüm widget'ları gizle/göster
+        self.toggle_all_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
+        self.toggle_all_shortcut.activated.connect(self.toggle_all_widgets)
+        
+        # Ctrl+Shift+H: Ana uygulamayı gizle/göster
+        self.hide_shortcut = QShortcut(QKeySequence("Ctrl+Shift+H"), self)
+        self.hide_shortcut.activated.connect(self.toggle_visibility)
+        
+
         
     def setup_system_tray(self):
         """Sistem tray'i kur"""
@@ -168,6 +226,60 @@ class KahyaWallpaper(QWidget):
         self.toggle_action = QAction("Gizle", self)
         self.toggle_action.triggered.connect(self.toggle_visibility)
         tray_menu.addAction(self.toggle_action)
+        
+        tray_menu.addSeparator()
+        
+        # Kontrol menüsü
+        control_menu_action = QAction("Kontrol Menüsü", self)
+        control_menu_action.triggered.connect(self.toggle_control_menu)
+        tray_menu.addAction(control_menu_action)
+        
+        # Kontrol menüsünü göster (gizliyse)
+        show_control_action = QAction("Kontrol Menüsünü Göster (Ctrl+Shift+C)", self)
+        show_control_action.triggered.connect(self.show_control_menu)
+        tray_menu.addAction(show_control_action)
+        
+        # Gizli widget'ları göster
+        show_hidden_action = QAction("Gizli Widget'ları Göster (Ctrl+Shift+W)", self)
+        show_hidden_action.triggered.connect(self.show_hidden_widgets)
+        tray_menu.addAction(show_hidden_action)
+        
+        # Tüm widget'ları gizle/göster
+        toggle_all_action = QAction("Tüm Widget'ları Gizle/Göster (Ctrl+Shift+A)", self)
+        toggle_all_action.triggered.connect(self.toggle_all_widgets)
+        tray_menu.addAction(toggle_all_action)
+        
+        tray_menu.addSeparator()
+        
+        # Widget yönetimi
+        widget_menu = tray_menu.addMenu("Widget Yönetimi")
+        
+        # Tümünü gizle/göster
+        self.toggle_all_action = QAction("Tümünü Gizle", self)
+        self.toggle_all_action.triggered.connect(self.toggle_all_widgets)
+        widget_menu.addAction(self.toggle_all_action)
+        
+        # Gizli widget'ları göster
+        show_hidden_action = QAction("Gizli Widget'ları Göster", self)
+        show_hidden_action.triggered.connect(self.show_hidden_widgets)
+        widget_menu.addAction(show_hidden_action)
+        
+        # Pozisyonları sıfırla
+        reset_action = QAction("Pozisyonları Sıfırla", self)
+        reset_action.triggered.connect(self.widget_manager.reset_positions)
+        widget_menu.addAction(reset_action)
+        
+        tray_menu.addSeparator()
+        
+        # Monitör seçimi (birden fazla monitör varsa)
+        if self.monitor_manager.get_monitor_count() > 1:
+            monitor_menu = tray_menu.addMenu("Monitör Seç")
+            for i, screen in enumerate(self.monitor_manager.screens):
+                action = QAction(f"{screen['name']} ({screen['geometry'].width()}x{screen['geometry'].height()})", self)
+                action.setCheckable(True)
+                action.setChecked(i == self.monitor_manager.get_current_monitor_index())
+                action.triggered.connect(lambda checked, idx=i: self.monitor_manager.switch_to_monitor(idx))
+                monitor_menu.addAction(action)
         
         tray_menu.addSeparator()
         
@@ -195,6 +307,28 @@ class KahyaWallpaper(QWidget):
             self.show()
             self.toggle_action.setText("Gizle")
             
+    def toggle_control_menu(self):
+        """Kontrol menüsünü gizle/göster"""
+        if hasattr(self, 'control_menu'):
+            if self.control_menu.isVisible():
+                self.control_menu.hide()
+            else:
+                self.control_menu.show()
+                self.control_menu.raise_()
+                
+    def show_control_menu(self):
+        """Kontrol menüsünü göster (gizliyse)"""
+        if hasattr(self, 'control_menu'):
+            self.control_menu.show()
+            self.control_menu.raise_()
+            # Kontrol menüsünü sağ üst köşeye yerleştir
+            screen_geometry = self.screen().geometry()
+            menu_x = screen_geometry.width() - 300 - 50  # 300 genişlik + 50 margin
+            menu_y = 50
+            self.control_menu.move(menu_x, menu_y)
+            # Ana pencereye focus ver (kısayol tuşları için)
+            self.setFocus()
+            
     def toggle_microphone(self):
         """Mikrofonu aç/kapat"""
         if self.sound_wave.is_listening:
@@ -220,7 +354,6 @@ class KahyaWallpaper(QWidget):
         """Ekranı güncelle"""
         # Kahya'nın ifadesini güncelle (kullanım istatistiklerine göre)
         if self.usage_tracker:
-            # Basit ifade değişimi (gelecekte daha karmaşık olabilir)
             import random
             expressions = ["neutral", "happy", "surprised"]
             if random.random() < 0.01:  # %1 şans
@@ -231,51 +364,14 @@ class KahyaWallpaper(QWidget):
         self.tray_icon.showMessage(title, message, QSystemTrayIcon.Information, 3000)
         
     def paintEvent(self, event):
-        """Özel çizim"""
+        """Özel çizim - widget tarzında"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # Yarı şeffaf arka plan
-        painter.setBrush(QBrush(QColor(0, 0, 0, 50)))
+        # Tamamen şeffaf arka plan
+        painter.setBrush(QBrush(QColor(0, 0, 0, 0)))
         painter.setPen(Qt.NoPen)
         painter.drawRect(self.rect())
-        
-        # Ana çerçeve
-        painter.setPen(QPen(QColor(0, 200, 0), 3))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRect(self.rect().adjusted(10, 10, -10, -10))
-        
-        # İç çerçeve
-        painter.setPen(QPen(QColor(0, 100, 0), 1))
-        painter.drawRect(self.rect().adjusted(15, 15, -15, -15))
-        
-        # Köşe dekorasyonları
-        self.draw_corners(painter)
-        
-    def draw_corners(self, painter):
-        """Köşe dekorasyonlarını çiz"""
-        width = self.width()
-        height = self.height()
-        corner_size = 30
-        
-        painter.setPen(QPen(QColor(0, 200, 0), 3))
-        
-        # Sol üst köşe
-        painter.drawLine(20, 20, corner_size, 20)
-        painter.drawLine(20, 20, 20, corner_size)
-        
-        # Sağ üst köşe
-        painter.drawLine(width - corner_size, 20, width - 20, 20)
-        painter.drawLine(width - 20, 20, width - 20, corner_size)
-        
-        # Sol alt köşe
-        painter.drawLine(20, height - corner_size, 20, height - 20)
-        painter.drawLine(20, height - 20, corner_size, height - 20)
-        
-        # Sağ alt köşe
-        painter.drawLine(width - corner_size, height - 20, width - 20, height - 20)
-        painter.drawLine(width - 20, height - corner_size, width - 20, height - 20)
-        
     def keyPressEvent(self, event):
         """Tuş basma olayı"""
         if event.key() == Qt.Key_Escape:
@@ -284,6 +380,11 @@ class KahyaWallpaper(QWidget):
             self.toggle_fullscreen()
         elif event.key() == Qt.Key_M:
             self.toggle_microphone()
+        elif event.key() == Qt.Key_Space:
+            # Space tuşunu engelle
+            event.accept()
+            return
+        super().keyPressEvent(event)
             
     def toggle_fullscreen(self):
         """Tam ekran modunu değiştir"""
@@ -297,6 +398,11 @@ class KahyaWallpaper(QWidget):
         if event.button() == Qt.RightButton:
             # Sağ tık menüsü
             self.show_context_menu(event.pos())
+        elif event.button() == Qt.LeftButton:
+            # Sol tık - masaüstüne odaklan
+            self.setFocus()
+            # Widget'ların arkasındaki masaüstüne tıklama geçir
+            event.ignore()
             
     def show_context_menu(self, pos):
         """Bağlam menüsünü göster"""
@@ -307,6 +413,39 @@ class KahyaWallpaper(QWidget):
         # Gizle/Göster
         toggle_action = menu.addAction("Gizle" if self.isVisible() else "Göster")
         toggle_action.triggered.connect(self.toggle_visibility)
+        
+        menu.addSeparator()
+        
+        # Kontrol menüsü
+        control_menu_action = menu.addAction("Kontrol Menüsü")
+        control_menu_action.triggered.connect(self.toggle_control_menu)
+        
+        menu.addSeparator()
+        
+        # Widget yönetimi
+        widget_menu = menu.addMenu("Widget Yönetimi")
+        
+        # Tümünü gizle/göster
+        toggle_all_action = menu.addAction("Tümünü Gizle" if all(widget.is_visible for widget in self.widget_manager.widgets.values()) else "Tümünü Göster")
+        toggle_all_action.triggered.connect(self.toggle_all_widgets)
+        widget_menu.addAction(toggle_all_action)
+        
+        # Pozisyonları sıfırla
+        reset_action = menu.addAction("Pozisyonları Sıfırla")
+        reset_action.triggered.connect(self.widget_manager.reset_positions)
+        widget_menu.addAction(reset_action)
+        
+        menu.addSeparator()
+        
+        # Monitör seçimi (birden fazla monitör varsa)
+        if self.monitor_manager.get_monitor_count() > 1:
+            monitor_menu = menu.addMenu("Monitör Seç")
+            for i, screen in enumerate(self.monitor_manager.screens):
+                action = QAction(f"{screen['name']} ({screen['geometry'].width()}x{screen['geometry'].height()})", self)
+                action.setCheckable(True)
+                action.setChecked(i == self.monitor_manager.get_current_monitor_index())
+                action.triggered.connect(lambda checked, idx=i: self.monitor_manager.switch_to_monitor(idx))
+                monitor_menu.addAction(action)
         
         menu.addSeparator()
         
@@ -332,12 +471,21 @@ class KahyaWallpaper(QWidget):
         # Zamanlayıcıları durdur
         self.update_timer.stop()
         
+        # Widget yöneticiyi temizle
+        if hasattr(self, 'widget_manager'):
+            self.widget_manager.cleanup()
+        
         # Bileşenleri temizle
-        self.calendar.cleanup()
-        self.clock.cleanup()
-        self.retro_chatbox.cleanup()
-        self.sound_wave.cleanup()
-        self.kahya_face.cleanup()
+        if hasattr(self, 'calendar'):
+            self.calendar.cleanup()
+        if hasattr(self, 'clock'):
+            self.clock.cleanup()
+        if hasattr(self, 'retro_chatbox'):
+            self.retro_chatbox.cleanup()
+        if hasattr(self, 'sound_wave'):
+            self.sound_wave.cleanup()
+        if hasattr(self, 'kahya_face'):
+            self.kahya_face.cleanup()
         
         # Kullanım takibini durdur
         if self.usage_tracker:

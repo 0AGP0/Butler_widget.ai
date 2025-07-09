@@ -31,6 +31,28 @@ class ReminderManager:
             print(f"Hatırlatıcı getirme hatası: {e}")
             return []
             
+    def get_all_reminders(self):
+        """Tüm hatırlatıcıları getir (takvim için)"""
+        try:
+            reminders = self.db.execute_query(
+                "SELECT * FROM reminders ORDER BY reminder_time"
+            )
+            # Takvim için uygun format
+            formatted_reminders = []
+            for reminder in reminders:
+                formatted_reminders.append({
+                    'id': reminder[0],
+                    'title': reminder[1],
+                    'message': reminder[2],
+                    'date': datetime.fromisoformat(reminder[3]).date(),
+                    'time': datetime.fromisoformat(reminder[3]).time(),
+                    'triggered': bool(reminder[4])
+                })
+            return formatted_reminders
+        except Exception as e:
+            print(f"Tüm hatırlatıcı getirme hatası: {e}")
+            return []
+            
     def get_active_reminders(self):
         """Aktif hatırlatıcıları getir"""
         return self.get_reminders(triggered=False)

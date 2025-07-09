@@ -56,26 +56,34 @@ class RetroChatbox(QWidget):
         self.typing_message_id = None
         self.response_received = False  # Çift mesajı engellemek için
         
+        # Renkler - pixel art teması
+        self.bg_color = QColor(8, 20, 10)  # Koyu yeşil arka plan
+        self.grid_color = QColor(40, 80, 40, 60)  # Grid çizgileri
+        self.text_color = QColor(80, 255, 120)  # Parlak yeşil metin
+        self.border_color = QColor(80, 255, 120)  # Yeşil kenarlık
+        self.detail_color = QColor(80, 255, 120)  # Detay rengi
+        
         self.setup_ui()
         self.setup_styling()
         
     def setup_ui(self):
         """UI bileşenlerini oluştur"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
         
         # Başlık
         title = QLabel("KAHYA AI CHAT")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("""
             QLabel {
-                color: #00ff00;
-                font-size: 14px;
+                color: #50ff78;
+                font-size: 12px;
                 font-weight: bold;
-                border: 2px solid #00ff00;
-                padding: 5px;
-                background-color: #001100;
+                border: 2px solid #50ff78;
+                padding: 6px;
+                background-color: #081410;
+                font-family: 'Courier';
             }
         """)
         layout.addWidget(title)
@@ -83,15 +91,15 @@ class RetroChatbox(QWidget):
         # Chat alanı
         self.chat_area = QTextEdit()
         self.chat_area.setReadOnly(True)
-        self.chat_area.setMaximumHeight(150)
+        self.chat_area.setMaximumHeight(120)
         self.chat_area.setStyleSheet("""
             QTextEdit {
-                background-color: #001100;
-                color: #00ff00;
-                border: 2px solid #00ff00;
-                font-family: 'Courier New';
-                font-size: 11px;
-                padding: 5px;
+                background-color: #081410;
+                color: #50ff78;
+                border: 2px solid #50ff78;
+                font-family: 'Courier';
+                font-size: 10px;
+                padding: 6px;
             }
         """)
         layout.addWidget(self.chat_area)
@@ -103,15 +111,15 @@ class RetroChatbox(QWidget):
         self.input_field.setPlaceholderText("Mesajınızı yazın...")
         self.input_field.setStyleSheet("""
             QLineEdit {
-                background-color: #001100;
-                color: #00ff00;
-                border: 2px solid #00ff00;
-                padding: 5px;
-                font-family: 'Courier New';
-                font-size: 11px;
+                background-color: #081410;
+                color: #50ff78;
+                border: 2px solid #50ff78;
+                padding: 6px;
+                font-family: 'Courier';
+                font-size: 10px;
             }
             QLineEdit:focus {
-                border: 2px solid #00ff88;
+                border: 2px solid #50ff78;
             }
         """)
         self.input_field.returnPressed.connect(self.send_message)
@@ -120,19 +128,20 @@ class RetroChatbox(QWidget):
         self.send_button = QPushButton("GÖNDER")
         self.send_button.setStyleSheet("""
             QPushButton {
-                background-color: #003300;
-                color: #00ff00;
-                border: 2px solid #00ff00;
-                padding: 5px 10px;
+                background-color: #102010;
+                color: #50ff78;
+                border: 2px solid #50ff78;
+                padding: 6px 12px;
                 font-weight: bold;
-                font-family: 'Courier New';
+                font-family: 'Courier';
+                font-size: 10px;
             }
             QPushButton:hover {
-                background-color: #004400;
-                border: 2px solid #00ff88;
+                background-color: #183018;
+                border: 2px solid #50ff78;
             }
             QPushButton:pressed {
-                background-color: #002200;
+                background-color: #081410;
             }
         """)
         self.send_button.clicked.connect(self.send_message)
@@ -147,9 +156,9 @@ class RetroChatbox(QWidget):
         """Genel stil ayarları"""
         self.setStyleSheet("""
             QWidget {
-                background-color: #000800;
-                color: #00ff00;
-                font-family: 'Courier New';
+                background-color: #081410;
+                color: #50ff78;
+                font-family: 'Courier';
             }
         """)
         
@@ -200,240 +209,150 @@ class RetroChatbox(QWidget):
         message_lower = message.lower()
         
         # Hatırlatıcı komutları
-        reminder_keywords = [
-            'hatırlat', 'hatırlatma', 'hatırlatıcı', 'reminder', 'unutma',
-            'aklında tut', 'not al', 'not et', 'kaydet', 'sakla'
-        ]
-        
-        # Not alma komutları
-        note_keywords = [
-            'not al', 'not et', 'kaydet', 'yaz', 'not defteri', 'not tut'
-        ]
-        
-        # Tarih/saat içeren mesajlar
-        import re
-        date_patterns = [
-            r'\d{1,2}\s*(?:ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)',
-            r'\d{1,2}\s*/\s*\d{1,2}',
-            r'\d{1,2}\s*\.\s*\d{1,2}',
-            r'bugün', 'yarın', 'yarın sabah', 'yarın akşam',
-            r'bu akşam', 'bu sabah', 'bu gece',
-            r'haftaya', 'gelecek hafta', 'bu hafta',
-            r'ayın \d{1,2}', r'bu ayın \d{1,2}', r'gelecek ayın \d{1,2}',
-            r'\d{1,2}\s+sinde', r'\d{1,2}\s+sında',  # "20 sinde", "15 sında" gibi
-            r'\d{1,2}\s+günü', r'\d{1,2}\s+gün',  # "20 günü", "15 gün" gibi
-            r'pazartesi', r'salı', r'çarşamba', r'perşembe', r'cuma', r'cumartesi', r'pazar'  # Günler
-        ]
-        
-        # Hatırlatıcı silme komutları (ÖNCE KONTROL ET!)
-        if any(keyword in message_lower for keyword in ['sil', 'kaldır', 'iptal']):
-            # Tarih var mı kontrol et
-            has_date = any(re.search(pattern, message_lower) for pattern in date_patterns)
-            if has_date:
-                return message  # Doğrudan router'a gönder
-        
-        # Hatırlatıcı komutu algıla
-        if any(keyword in message_lower for keyword in reminder_keywords):
-            # Tarih var mı kontrol et
-            has_date = any(re.search(pattern, message_lower) for pattern in date_patterns)
-            if has_date:
-                return f"hatırlatıcı_ekle {message}"
-        
-        # Tarih içeren mesajlar (hatırlatıcı olabilir)
-        has_date = any(re.search(pattern, message_lower) for pattern in date_patterns)
-        if has_date:
-            # Tarih var ama hatırlat kelimesi yok, yine de hatırlatıcı olabilir
-            return f"hatırlatıcı_ekle {message}"
-        
-        # Not alma komutu algıla
-        if any(keyword in message_lower for keyword in note_keywords):
-            return f"not_al {message}"
-        
-        # Todo komutları
-        if 'yapılacak' in message_lower or 'todo' in message_lower or 'görev' in message_lower:
-            return f"todo_ekle {message}"
-        
-        # Hatırlatıcıları listele
-        if 'hatırlatıcılarım' in message_lower or 'hatırlatıcılar' in message_lower:
-            return "hatırlatıcılar"
-        
-        # Notları listele
-        if 'notlarım' in message_lower or 'notlar' in message_lower:
-            return "notlar"
-        
-        return None
-    
-
+        if any(keyword in message_lower for keyword in ['hatırlat', 'hatırlatıcı', 'reminder']):
+            return f"reminder: {message}"
             
+        # Not komutları
+        if any(keyword in message_lower for keyword in ['not al', 'not ekle', 'kaydet', 'save']):
+            return f"note: {message}"
+            
+        # Todo komutları
+        if any(keyword in message_lower for keyword in ['todo', 'yapılacak', 'görev', 'task']):
+            return f"todo: {message}"
+            
+        # Dosya işlemleri
+        if any(keyword in message_lower for keyword in ['dosya aç', 'file open', 'klasör aç']):
+            return f"file: {message}"
+            
+        # Web arama
+        if any(keyword in message_lower for keyword in ['ara', 'search', 'google']):
+            return f"search: {message}"
+            
+        return None
+        
     def start_typing_animation(self):
         """Yazma animasyonunu başlat"""
         self.is_typing = True
         self.typing_dots = 0
-        self.typing_timer.start(500)
+        self.typing_timer.start(500)  # 500ms
+        self.kahya_talking.emit(True)
         
-        # Tek bir "yazıyor" mesajı ekle
-        timestamp = time.strftime("[%H:%M:%S]")
-        self.typing_message_id = f"{timestamp} Sistem: Kahya yazıyor"
-        self.chat_area.append(self.typing_message_id)
-        self.scroll_to_bottom()
+        # Yazma mesajını ekle
+        self.typing_message_id = f"typing_{int(time.time())}"
+        self.add_system_message("Kahya yazıyor...")
         
     def update_typing_animation(self):
         """Yazma animasyonunu güncelle"""
-        if not self.is_typing:
-            return
+        self.typing_dots += 1
+        if self.typing_dots > 3:
+            self.typing_dots = 0
             
-        self.typing_dots = (self.typing_dots + 1) % 4
+        # Yazma mesajını güncelle
         dots = "." * self.typing_dots
-        
-        # Mevcut scroll pozisyonunu kaydet
-        scrollbar = self.chat_area.verticalScrollBar()
-        was_at_bottom = scrollbar.value() == scrollbar.maximum()
-        
-        # Son satırı güncelle (yazıyor mesajını)
-        cursor = self.chat_area.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.select(QTextCursor.LineUnderCursor)
-        cursor.removeSelectedText()
-        
-        # Yeni dots ile güncelle
-        timestamp = time.strftime("[%H:%M:%S]")
-        new_typing_message = f"{timestamp} Sistem: Kahya yazıyor{dots}"
-        cursor.insertText(new_typing_message)
-        
-        # Eğer en alttaysa, scroll pozisyonunu koru
-        if was_at_bottom:
-            self.scroll_to_bottom()
+        self.add_system_message(f"Kahya yazıyor{dots}")
         
     def handle_llm_response(self, response):
         """LLM yanıtını işle"""
-        self.typing_timer.stop()
-        self.is_typing = False
-        self.response_received = True
-        
-        # Son "yazıyor" mesajını kaldır
-        cursor = self.chat_area.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.select(QTextCursor.LineUnderCursor)
-        cursor.removeSelectedText()
-        cursor.deletePreviousChar()  # Satır sonu karakterini kaldır
-        
-        # Yanıtı ekle
-        self.add_kahya_message(response)
-        
+        if not self.response_received:
+            self.response_received = True
+            self.is_typing = False
+            self.typing_timer.stop()
+            self.kahya_talking.emit(False)
+            
+            # Yazma mesajını kaldır ve yanıtı ekle
+            self.add_kahya_message(response)
+            
     def handle_llm_error(self, error):
         """LLM hatasını işle"""
-        self.typing_timer.stop()
         self.is_typing = False
-        self.response_received = True
-        
-        # Son "yazıyor" mesajını kaldır
-        cursor = self.chat_area.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.select(QTextCursor.LineUnderCursor)
-        cursor.removeSelectedText()
-        cursor.deletePreviousChar()
-        
+        self.typing_timer.stop()
+        self.kahya_talking.emit(False)
         self.add_system_message(f"Hata: {error}")
-    
+        
     def handle_llm_command(self, response):
         """LLM komut yanıtını işle"""
-        self.typing_timer.stop()
-        self.is_typing = False
-        self.response_received = True
-        
-        # Son "yazıyor" mesajını kaldır
-        cursor = self.chat_area.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.select(QTextCursor.LineUnderCursor)
-        cursor.removeSelectedText()
-        cursor.deletePreviousChar()
-        
-        # LLM komut işlemi yapmış, yanıtı göster
-        self.add_kahya_message(response)
-        
+        if not self.response_received:
+            self.response_received = True
+            self.is_typing = False
+            self.typing_timer.stop()
+            self.kahya_talking.emit(False)
+            
+            # Yazma mesajını kaldır ve yanıtı ekle
+            self.add_kahya_message(response)
+            
     def add_user_message(self, message):
         """Kullanıcı mesajını ekle"""
-        timestamp = time.strftime("[%H:%M:%S]")
-        self.chat_area.append(f"{timestamp} Siz: {message}")
+        self.chat_area.append(f"<span style='color: #50ff78;'><b>Siz:</b> {message}</span>")
         self.scroll_to_bottom()
         
     def add_kahya_message(self, message):
         """Kahya mesajını ekle"""
-        timestamp = time.strftime("[%H:%M:%S]")
-        self.chat_area.append(f"{timestamp} Kahya: {message}")
+        self.chat_area.append(f"<span style='color: #50ff78;'><b>Kahya:</b> {message}</span>")
         self.scroll_to_bottom()
-        
-        # Kahya konuşmaya başladı sinyali gönder
-        self.kahya_talking.emit(True)
-        
-        # 3 saniye sonra konuşmayı durdur
-        QTimer.singleShot(3000, lambda: self.kahya_talking.emit(False))
         
     def add_system_message(self, message):
         """Sistem mesajını ekle"""
-        timestamp = time.strftime("[%H:%M:%S]")
-        self.chat_area.append(f"{timestamp} Sistem: {message}")
+        self.chat_area.append(f"<span style='color: #50ff78; font-style: italic;'>{message}</span>")
         self.scroll_to_bottom()
         
     def add_response(self, response):
-        """Dışarıdan yanıt ekle (router'dan)"""
-        print(f"Chatbox: Router yanıtı alındı: {response}")
-        
-        # Router yanıtı geldiğinde LLM'e gitmeyi engelle
-        self.response_received = True
-        
-        if self.is_typing:
-            # Yazma animasyonu varsa, onu durdur ve yanıtı ekle
-            self.typing_timer.stop()
+        """Yanıt ekle (router'dan gelen)"""
+        if not self.response_received:
+            self.response_received = True
             self.is_typing = False
+            self.typing_timer.stop()
+            self.kahya_talking.emit(False)
             
-            # Son "yazıyor" mesajını kaldır
-            cursor = self.chat_area.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            cursor.select(QTextCursor.LineUnderCursor)
-            cursor.removeSelectedText()
-            cursor.deletePreviousChar()
+            # Yazma mesajını kaldır ve yanıtı ekle
+            self.add_kahya_message(response)
             
-        self.add_kahya_message(response)
-        
     def scroll_to_bottom(self):
         """Chat alanını en alta kaydır"""
-        scrollbar = self.chat_area.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        cursor = self.chat_area.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.chat_area.setTextCursor(cursor)
         
     def paintEvent(self, event):
-        """Özel çizim"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing, False)  # Pixel art için
         
-        # Kenarlık çiz
-        painter.setPen(QPen(QColor(0, 255, 0), 2))
+        # Widget boyutları
+        w, h = self.width(), self.height()
+        
+        # Arka plan (gridli pixel art)
+        painter.fillRect(0, 0, w, h, self.bg_color)
+        
+        # Grid çizgileri
+        grid_size = 8
+        painter.setPen(QPen(self.grid_color, 1))
+        for x in range(0, w, grid_size):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, grid_size):
+            painter.drawLine(0, y, w, y)
+        
+        # Dış çerçeve (pixel-art)
+        painter.setPen(QPen(self.border_color, 4))
         painter.setBrush(Qt.NoBrush)
-        painter.drawRect(self.rect().adjusted(1, 1, -1, -1))
+        margin = 12
+        painter.drawRect(margin, margin, w-2*margin, h-2*margin)
         
-        # Köşe dekorasyonları
-        corner_size = 8
-        painter.setPen(QPen(QColor(0, 255, 0), 2))
+        # Köşe detayları
+        painter.setPen(QPen(self.border_color, 4))
+        for dx in [0, w-2*margin]:
+            for dy in [0, h-2*margin]:
+                painter.drawPoint(margin+dx, margin+dy)
         
-        # Sol üst köşe
-        painter.drawLine(5, 5, corner_size, 5)
-        painter.drawLine(5, 5, 5, corner_size)
+        # Yan çıkıntılar
+        painter.setPen(QPen(self.border_color, 4))
+        painter.drawLine(margin-8, h//2-25, margin, h//2-25)
+        painter.drawLine(margin-8, h//2+25, margin, h//2+25)
+        painter.drawLine(w-margin+8, h//2-25, w-margin, h//2-25)
+        painter.drawLine(w-margin+8, h//2+25, w-margin, h//2+25)
         
-        # Sağ üst köşe
-        painter.drawLine(self.width() - corner_size, 5, self.width() - 5, 5)
-        painter.drawLine(self.width() - 5, 5, self.width() - 5, corner_size)
-        
-        # Sol alt köşe
-        painter.drawLine(5, self.height() - corner_size, 5, self.height() - 5)
-        painter.drawLine(5, self.height() - 5, corner_size, self.height() - 5)
-        
-        # Sağ alt köşe
-        painter.drawLine(self.width() - corner_size, self.height() - 5, self.width() - 5, self.height() - 5)
-        painter.drawLine(self.width() - 5, self.height() - corner_size, self.width() - 5, self.height() - 5)
+        # Üst ve alt detay çizgiler
+        painter.drawLine(margin+24, margin-8, w-margin-24, margin-8)
+        painter.drawLine(margin+24, h-margin+8, w-margin-24, h-margin+8)
         
     def cleanup(self):
         """Temizlik"""
-        self.typing_timer.stop()
-        if hasattr(self, 'worker') and self.worker.isRunning():
-            self.worker.terminate()
-            self.worker.wait() 
+        self.typing_timer.stop() 
